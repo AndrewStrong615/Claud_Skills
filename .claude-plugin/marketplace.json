@@ -1,0 +1,11 @@
+{
+  "name": "playtest",
+  "owner": { "name": "AndrewStrong615" },
+  "plugins": [
+    {
+      "name": "playtest",
+      "source": "./",
+      "description": "Turns Claude into a test user: launches your app, plays it in a real browser as a persona, tries to break it, and writes a findings report with screenshots."
+    }
+  ]
+}

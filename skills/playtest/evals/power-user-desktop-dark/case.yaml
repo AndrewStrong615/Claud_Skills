@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: power-user-desktop-dark
+expected_outcome: |
+  A desktop (about 1440 wide), dark-mode session focused on chat and approval cards, with break-it tours (double submit, reload mid-flow, long input, offline) and a report.

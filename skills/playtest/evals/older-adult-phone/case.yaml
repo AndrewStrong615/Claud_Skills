@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: older-adult-phone
+expected_outcome: |
+  The app is started from its profile, a phone-sized browser session is played as the persona with screenshots, the emergency and approval checks are run, and a report.md with severity-ranked, reproducible findings is written.

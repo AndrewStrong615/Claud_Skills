@@ -1,0 +1,7 @@
+{
+  "name": "playtest",
+  "version": "0.1.0",
+  "description": "Turns Claude into a test user: launches your app, plays it in a real browser as a persona, tries to break it, and writes a findings report with screenshots.",
+  "author": { "name": "AndrewStrong615" },
+  "keywords": ["playtest", "qa", "exploratory-testing", "usability", "playwright"]
+}

@@ -1,0 +1,5 @@
+node_modules/
+playtest-*/
+playtest-out/
+*-workspace/
+evals/results/
