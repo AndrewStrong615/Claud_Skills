@@ -35,6 +35,10 @@ nohup node e2e/serve.mjs > ../web.log 2>&1 &
 ```
 
 - **App URL:** http://localhost:8082
+- **Ready check:** `/health` answers 200 even when PostgreSQL is down, so also run `pg_isready -h localhost`,
+  or a wrong-password sign-in that must answer 401, not 500:
+  `curl -s -o /dev/null -w "%{http_code}" -X POST localhost:8000/auth/login -H 'content-type: application/json' -d '{"email":"nobody@example.com","password":"wrong-password"}'`.
+  After a container restart PostgreSQL usually needs starting again (`service postgresql start`).
 - **Stop:** `pkill -f "uvicorn app.main:app"; pkill -f e2e/serve.mjs`
 - **Logs:** `api.log` (server errors behind a failed request), `web.log`.
 - **Real Claude:** only if the user asks and provides `ANTHROPIC_API_KEY` in `backend/.env`. In that case,
@@ -80,6 +84,10 @@ these words. Things to know about the stand-in:
   "Follow-up with Dr. Chen" two days out at 3:30. Duplicates are still real findings when the server
   accepts them, but wrong names or times are not.
 
+Expo Router keeps earlier screens mounted but hidden, so the page can hold several "Message MedHelp"
+boxes and Send buttons. The driver's commands only use visible ones, but `eval` with
+`document.querySelector` can hit a hidden one and make a working feature look broken.
+
 ## Areas
 
 Chat (home), drawer menu ("Open menu"): Health record (tiles → lists → one item's page), Connections (All
@@ -122,8 +130,12 @@ These are MedHelp's hard safety rules. Breaking any one of them is a **Blocker**
 
 ## Expected in this environment (not bugs)
 
-- Epic MyChart sign-in answers 502, and the app should say "The sign-in page for this source couldn't be
-  found. Try again later." Report it only if that message is missing or unclear.
+- Health-record portals (Epic MyChart and others) appear only when their connectors are configured. With
+  none configured, Connections on web offers just the Demo patient, and Apple Health and Health Connect
+  are marked as phone-only. Where MyChart is listed but unreachable, its sign-in answers 502 and the app
+  should say "The sign-in page for this source couldn't be found. Try again later."
+- The Demo patient "connects" without creating a connection record, so the Privacy center's Connected
+  sources list may not show it. That's still worth reporting as a mismatch.
 - The FDA label check and MedlinePlus "What it is" may answer 503 where the network blocks them. The pages
   should say so.
 - Generic chat replies to messages the development model has no route for.

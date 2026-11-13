@@ -22,10 +22,11 @@ const HELP = `Commands (targets: plain text, label=…, placeholder=…, role=bu
   shot [name]              screenshot of the viewport
   fullshot [name]          screenshot of the whole page
   click <target>           click (plain text tries button, link, tab, then any text)
-  dblclick <target>        double-click
+  dblclick <target>        double-click (a fast double submit)
   fill <target> <text>     clear a field and type into it
   type <text>              type into whatever has focus
-  press <key>              e.g. Enter, Tab, Escape, ArrowDown, Shift+Tab
+  press <key> [times]      e.g. Enter, Escape, ArrowDown; "press Enter 2" presses twice with no pause
+                           (a real double submit). Tab and Shift+Tab print the new focus, no screenshot
   hover <target>           hover
   select <target> <value>  choose an <option>
   wait <text|ms>           wait for text to appear (30 s) or for some milliseconds
@@ -37,7 +38,11 @@ const HELP = `Commands (targets: plain text, label=…, placeholder=…, role=bu
   theme <dark|light>       the device's colour-scheme preference (an in-app theme setting overrides it)
   offline <on|off>         cut or restore the network
   events                   every error and failed request since start
-  eval <js>                run JavaScript in the page and print the result
+  eval <js>                run JavaScript in the page and print the result. Careful: apps that keep
+                           earlier screens mounted (Expo Router, tabs) hold hidden copies of controls,
+                           so document.querySelector can hit an invisible one
+  dialogs <accept|dismiss> how to answer the next confirm()/alert()/prompt() dialogs (default accept).
+                           Every dialog is printed as a DIALOG line; downloads are saved to the out folder
   stop                     close the browser`;
 
 // ---------------------------------------------------------------- client
@@ -150,19 +155,26 @@ async function serve(opts) {
   page.on("pageerror", (e) => note("pageerror", e.message));
   page.on("requestfailed", (r) => note("requestfailed", `${r.method()} ${r.url()} ${r.failure()?.errorText ?? ""}`));
   page.on("response", (r) => r.status() >= 400 && note(`http ${r.status()}`, `${r.request().method()} ${r.url()}`));
+  let dialogMode = "accept";
+  const shown = []; // dialogs and downloads, printed prominently after the action that caused them
   page.on("dialog", (d) => {
-    note("dialog", `${d.type()}: ${d.message()} (accepted)`);
-    d.accept().catch(() => {});
+    shown.push(`DIALOG (${d.type()}, ${dialogMode}ed): ${d.message()}`);
+    (dialogMode === "accept" ? d.accept() : d.dismiss()).catch(() => {});
   });
-  page.on("download", (d) => note("download", d.suggestedFilename()));
+  page.on("download", async (d) => {
+    const file = path.join(opts.out, `download-${d.suggestedFilename()}`);
+    await d.saveAs(file).catch(() => {});
+    shown.push(`DOWNLOAD saved: ${file}`);
+  });
 
   const journal = fs.createWriteStream(path.join(opts.out, "session.jsonl"), { flags: "a" });
 
   const fresh = () => {
     const list = events.slice(reported);
     reported = events.length;
-    if (!list.length) return "";
-    return "\nNEW EVENTS:\n" + list.map((e) => `  [${e.kind}] ${e.text}`).join("\n");
+    let out = shown.length ? "\n" + shown.splice(0).join("\n") : "";
+    if (list.length) out += "\nNEW EVENTS:\n" + list.map((e) => `  [${e.kind}] ${e.text}`).join("\n");
+    return out;
   };
 
   const settle = async () => {
@@ -230,6 +242,19 @@ async function serve(opts) {
       throw new Error(`"${target}"${note} is disabled, so tapping it does nothing. Does the screen say why?`);
   };
 
+  // One line describing what has keyboard focus (role, name, box, outline).
+  const focused = () =>
+    page.evaluate(() => {
+      const e = document.activeElement;
+      if (!e || e === document.body) return "nothing (body)";
+      const r = e.getBoundingClientRect();
+      const raw = e.getAttribute("aria-label") || e.innerText || e.getAttribute("placeholder") || "";
+      const name = raw.trim().replace(/\s+/g, " ").slice(0, 80);
+      const role = e.getAttribute("role") || e.tagName.toLowerCase();
+      const box = `${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}`;
+      return `${role} "${name}" at ${box}; outline: ${getComputedStyle(e).outlineStyle}`;
+    });
+
   const after = async (label, extra = "", shot = true) => {
     await settle();
     const file = shot ? `\nscreenshot: ${await shoot(label)}` : "";
@@ -279,7 +304,19 @@ async function serve(opts) {
       return after(`fill ${target}`, note);
     },
     type: async (words) => (await page.keyboard.type(words.join(" "), { delay: 15 }), after("type")),
-    press: async ([key]) => (await page.keyboard.press(key), after(`press ${key}`)),
+    press: async ([key, times]) => {
+      const n = Math.max(1, Math.min(20, Number(times) || 1));
+      for (let i = 0; i < n; i++) await page.keyboard.press(key);
+      if (/^(Shift\+)?Tab$/.test(key)) {
+        await page.waitForTimeout(150);
+        return `OK press ${key}${n > 1 ? ` x${n}` : ""}\nfocused: ${await focused()}${fresh()}`;
+      }
+      return after(`press ${key}${n > 1 ? ` x${n}` : ""}`);
+    },
+    dialogs: async ([mode]) => {
+      dialogMode = mode === "dismiss" ? "dismiss" : "accept";
+      return `Dialogs will be ${dialogMode}ed from now on.`;
+    },
     select: async ([target, value]) => {
       const { el, note } = await resolve(target);
       await el.selectOption(value);
@@ -312,17 +349,7 @@ async function serve(opts) {
       }
       return after(`scroll ${where || "down"}`);
     },
-    focus: async () => {
-      const info = await page.evaluate(() => {
-        const e = document.activeElement;
-        if (!e || e === document.body) return "nothing (body)";
-        const r = e.getBoundingClientRect();
-        const name = e.getAttribute("aria-label") || e.innerText?.trim().slice(0, 80) || e.getAttribute("placeholder") || "";
-        const outline = getComputedStyle(e).outlineStyle;
-        return `${e.getAttribute("role") || e.tagName.toLowerCase()} "${name}" at ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}; focus outline: ${outline}`;
-      });
-      return `focused: ${info}\nscreenshot: ${await shoot("focus")}${fresh()}`;
-    },
+    focus: async () => `focused: ${await focused()}${fresh()}`,
     size: async ([wh]) => {
       const [nw, nh] = wh.split("x").map(Number);
       base = { width: nw, height: nh };

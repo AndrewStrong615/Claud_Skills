@@ -29,9 +29,13 @@ Look for a profile that says how to start this app and what matters in it, in th
    `profiles/TEMPLATE.md` and save it as `.playtest.md` in the app's repo, telling the user you did, so the
    next playtest starts in seconds.
 
-Start what the profile says and confirm the app's URL answers before you open a browser. A playtest of an
-app that isn't running is wasted effort, so if a server fails, read its log and fix the setup first. That
-might mean a missing database, a missing `.env` or an unbuilt bundle. Fix the environment, never the app.
+Start what the profile says and confirm the app works end to end before you open a browser. A health
+check that answers 200 can still sit on a dead database, so use the profile's ready check, or make one
+request that touches the data, such as a sign-in with a wrong password that should answer 401, not 500.
+A playtest of a half-running app produces false findings. If something fails, read its log and fix the
+setup first: a stopped database, a missing `.env`, an unbuilt bundle. Fix the environment, never the app.
+If you've been told not to touch the servers and something is down, don't play. Report what is down and
+stop, so whoever runs the servers can fix it.
 
 Ground rules that keep a playtest safe:
 - Prefer the app's development or stub modes, such as fake AI models, sandbox payments or seeded demo data.
@@ -82,8 +86,8 @@ node $D stop
 Plain-text targets try an exact control name first (button, link, tab, radio and so on), then partial
 names, then any visible text. Each action prints what it actually hit (`-> button "Create account"`) and
 flags partial matches, so check that line. Clicking "Atorvastatin" can hit "Refill Atorvastatin…". Use
-`label=…`, `placeholder=…`, `role=radio[name="…"]`, `testid=…` or CSS when plain words aren't precise
-enough. If plain words don't work, a real user would also struggle. That can be a finding: a control with
+`label=…`, `placeholder=…`, `'role=radio[name="…"]'`, `testid=…` or CSS when plain words aren't precise
+enough. Wrap selectors that contain quotes in single quotes, or the shell eats the inner ones. If plain words don't work, a real user would also struggle. That can be a finding: a control with
 no accessible name, or two controls with the same name.
 
 Quirks worth knowing:
@@ -94,6 +98,15 @@ Quirks worth knowing:
 - Clicking a disabled control returns at once, saying it's disabled. Ask whether the screen tells the
   person why.
 - Reusing an `--out` folder continues the screenshot numbering, and `stop` then `start` is safe.
+- Every action waits up to ~3 s for the page to settle, so two separate commands are never a real double
+  submit. Use `dblclick` or `press Enter 2`.
+- Native `confirm()` dialogs are accepted by default and printed as a `DIALOG` line. Read it before
+  reporting "no confirmation", and use `dialogs dismiss` to test Cancel. Downloads are saved to the
+  output folder, so open them and check the contents.
+- `press Tab` and `focus` print the focused element without a screenshot. Take a `shot` when the focus
+  ring itself matters. Don't trim command output with `head`, because dialogs and errors come last.
+- A reload resets anything the app doesn't persist, including an in-app theme. Re-apply it before judging
+  the next screens.
 
 **The loop.** Repeat until the mission is done or clearly blocked:
 
