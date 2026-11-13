@@ -132,12 +132,14 @@ you saw, typically:
 - **Interruptions:** Back mid-flow, reload mid-flow, go `offline on` then retry, open a deep URL directly.
 - **Other sizes and themes:** `size 1440x900`, `theme dark`. Look for clipped text and invisible icons.
 - **Keyboard only:** `press Tab` repeatedly plus `focus`. Can you reach and see every control?
-- **The profile's must-check list:** safety-critical flows the app must always get right. Run each check
-  with the profile's example, and then the way *this persona* would hit it. Use their own conditions,
-  situation, vocabulary and typos. The profile's example is the case someone already tested, and the
-  persona's version is where the gaps are. In a health app with a diabetic persona, test a blood-sugar
-  emergency as well as chest pain. In a banking app with a caregiver persona, test a payment made on
-  someone else's behalf.
+- **The profile's must-check list:** flows the app must always get right. Run each check with the
+  profile's example, and then the way *this persona* would hit it, in their situation, vocabulary and
+  typos. The profile's example is the case someone already tested, and the persona's version is where the
+  gaps are. For example, in a banking app with a caregiver persona, test a payment made on someone else's
+  behalf.
+- **Stay inside the product's scope.** If the profile says what the app does *not* do (diagnose, give
+  legal or financial advice), don't file the missing thing as a gap. Do file any place where the app
+  crosses that line.
 
 Stop when you've used the budget or keep finding the same class of issue. Then `stop` the browser.
 
